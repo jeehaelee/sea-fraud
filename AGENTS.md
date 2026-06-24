@@ -86,6 +86,34 @@ Token (PAT)**. Key facts:
 For a Cloud Agent automation, store the PAT as a Cursor Secret (do not hardcode it) and pass it
 to the Snowflake MCP server via env.
 
+### CRITICAL: DoorDash Snowflake network policy blocks Cloud Agent IPs
+
+Verified by a live test from a Cloud Agent VM (with a real PAT): DoorDash's Snowflake account
+enforces an **IP allowlist (network policy)**. Connecting from the Cloud Agent's egress IP fails
+at login, before token validation, with:
+
+```
+250001 (08001): Failed to connect to DB: doordash.snowflakecomputing.com:443.
+Incoming request with IP/Token <cloud-ip> is not allowed to access Snowflake.
+Contact your account administrator.
+```
+
+Implications for this repo's automation:
+
+- **From a laptop on Tailscale VPN**: works (the corporate/Tailscale egress IP is allowlisted).
+  This is DoorDash's documented, supported path (PAT + Tailscale). The host itself is reachable
+  from anywhere (returns HTTP 302), but *login* is gated by the network policy.
+- **From a Cloud Agent (default networking)**: BLOCKED regardless of how valid the PAT is. No
+  token/credential change fixes this. To make a Cloud Agent reach DoorDash Snowflake you need
+  EITHER (a) a Snowflake admin to add the Cloud Agent provider's egress IPs to the account
+  network policy (an `INGRESS` network rule), OR (b) route the VM's traffic through Tailscale
+  userspace networking so it egresses from an allowlisted IP (requires a Tailscale auth key +
+  DoorDash tailnet/ACL approval + the Tailscale egress IP being allowlisted in the Snowflake
+  network policy). Both require action outside this repo and likely DoorDash IT/admin approval.
+
+Net: the Cloud Agent fraud-report automation cannot talk to Snowflake until one of those network
+paths is arranged. The PAT alone is necessary but not sufficient from the cloud.
+
 ### Running the report (hello-world)
 
 The end-to-end "hello world" is: run the Snowflake fraud query → write results into the
