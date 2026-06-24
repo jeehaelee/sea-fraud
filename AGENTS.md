@@ -61,6 +61,31 @@ Cursor OAuth callback URI for the security integration:
 `cursor://anysphere.cursor-mcp/oauth/callback`. Reference:
 https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-agents-mcp
 
+### DoorDash-specific Snowflake connection (the supported method here)
+
+DoorDash's officially documented Snowflake MCP setup (per internal "How To: Setup Snowflake
+MCP" doc) does NOT use the OAuth/managed-server URL approach. It uses the open-source
+**Snowflake-Labs MCP server run locally via `uvx`**, authenticated with a **Personal Access
+Token (PAT)**. Key facts:
+
+- `SNOWFLAKE_ACCOUNT = doordash`; host `doordash.snowflakecomputing.com` is reachable from the
+  Cloud VM (verified: returns HTTP 302 quickly, so no network-layer block to the endpoint).
+- Auth = PAT generated at
+  `https://unity.doordash.com/suites/data/data-tools/account-management/generate-pat`
+  (shown once; copy immediately). PATs expire — an expired PAT is the likely cause of
+  intermittent "timing out" connections. Regenerate with the longest allowed lifetime.
+- `SNOWFLAKE_USER` is usually `FIRSTNAME.LASTNAME`; pick a `SNOWFLAKE_ROLE` you actually have
+  (this user has e.g. `JEEHAELEE`, `READ_ONLY_USERS`, etc. — no admin role) and a warehouse
+  you can use (doc example uses `ADHOC`). No `ACCOUNTADMIN` is available to this user, so the
+  admin-only OAuth/managed-server path above is not self-serve for them.
+- Reference command (desktop IDE): `uvx snowflake-labs-mcp --service-config-file <config.yaml>`
+  with `SNOWFLAKE_ACCOUNT/USER/PASSWORD(PAT)/WAREHOUSE/ROLE` env vars. The doc also lists
+  Tailscale VPN as a prerequisite for the corporate-network path; from a Cloud Agent the PAT +
+  reachable host is what matters.
+
+For a Cloud Agent automation, store the PAT as a Cursor Secret (do not hardcode it) and pass it
+to the Snowflake MCP server via env.
+
 ### Running the report (hello-world)
 
 The end-to-end "hello world" is: run the Snowflake fraud query → write results into the
